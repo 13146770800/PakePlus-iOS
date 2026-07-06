@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0,user-scalable=no,viewport-fit=cover">
+    <title>晷 · 慢钟</title>
+    <style>
+        :root {
+            --safe-bottom: env(safe-area-inset-bottom, 0px);
+            --safe-top: env(safe-area-inset-top, 0px);
+            --safe-left: env(safe-area-inset-left, 0px);
+            --safe-right: env(safe-area-inset-right, 0px);
+        }
+
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #0f0f0f;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            -webkit-touch-callout: none;
+        }
+
+        canvas {
+            display: block;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            z-index: 0 !important;
+            pointer-events: auto;
+            touch-action: manipulation;
+        }
+
+        #mantra {
+            position: fixed;
+            color: rgba(255, 255, 255, 0);
+            font-family: "Songti SC", "Noto Serif SC", "STSong", "SimSun", serif;
+            text-align: center;
+            white-space: nowrap;
+            pointer-events: none;
+            user-select: none;
+            -webkit-user-select: none;
+            z-index: 10;
+            transition: color 0.3s ease;
+        }
+
+        #digitalClock {
+            position: fixed;
+            color: rgba(255, 255, 255, 0);
+            font-family: "Helvetica Neue", "Courier New", "SF Mono", monospace;
+            pointer-events: none;
+            user-select: none;
+            -webkit-user-select: none;
+            z-index: 20;
+            transition: color 0.3s ease, text-shadow 0.3s ease;
+            letter-spacing: 2px;
+        }
+
+        #settingsBtn,
+        #modeBtn,
+        #timerPanel,
+        #settingsPanel,
+        #miniTimerPanel {
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        #settingsBtn {
+            position: fixed;
+            top: max(18px, calc(18px + var(--safe-top)));
+            left: max(22px, calc(22px + var(--safe-left)));
+            z-index: 100;
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            padding: 10px 16px;
+            font-size: 18px;
+            cursor: pointer;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            transition: background 0.3s, color 0.3s, transform 0.1s;
+            line-height: 1;
+            touch-action: manipulation;
+            pointer-events: auto;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        #settingsBtn:hover { background: rgba(255, 255, 255, 0.18); color: #fff; }
+        #settingsBtn:active { background: rgba(255, 255, 255, 0.25); transform: scale(0.94); }
+
+        #settingsPanel {
+            display: none;
+            position: fixed;
+            top: max(64px, calc(64px + var(--safe-top)));
+            left: max(22px, calc(22px + var(--safe-left)));
+            z-index: 99;
+            background: rgba(20, 20, 22, 0.94);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            padding: 22px 24px;
+            min-width: 220px;
+            max-width: calc(100vw - 50px - var(--safe-left) - var(--safe-right));
+            max-height: calc(100vh - 120px - var(--safe-top) - var(--safe-bottom));
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            touch-action: pan-y;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+            user-select: none;
+            -webkit-user-select: none;
+            color: rgba(255, 255, 255, 0.85);
+            font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+            font-size: 13px;
+            pointer-events: auto;
+        }
+        #settingsPanel label { display: block; margin-bottom: 4px; color: rgba(255, 255, 255, 0.5); font-size: 12px; pointer-events: auto; }
+        #settingsPanel .row { margin-bottom: 14px; }
+        #settingsPanel .val { float: right; color: rgba(255, 255, 255, 0.6); font-size: 12px; }
+        #settingsPanel input[type=range] {
+            width: 100%; -webkit-appearance: none; appearance: none; height: 4px;
+            background: rgba(255, 255, 255, 0.12); border-radius: 2px; outline: none;
+            touch-action: pan-x; cursor: pointer; pointer-events: auto; position: relative; z-index: 1;
+        }
+        #settingsPanel input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%;
+            background: rgba(120, 140, 255, 0.6); cursor: pointer; border: none; pointer-events: auto;
+        }
+        #settingsPanel input[type=range]::-moz-range-thumb {
+            width: 22px; height: 22px; border-radius: 50%; background: rgba(120, 140, 255, 0.6); cursor: pointer; border: none;
+        }
+        #settingsPanel input[type=checkbox] { accent-color: rgba(120, 140, 255, 0.6); width: 16px; height: 16px; vertical-align: middle; cursor: pointer; pointer-events: auto; }
+        #settingsPanel .sep { border-top: 1px solid rgba(255, 255, 255, 0.06); margin: 12px 0; }
+        #settingsPanel .panel-title { font-size: 14px; color: rgba(255, 255, 255, 0.75); margin-bottom: 12px; letter-spacing: 1px; }
+        #settingsPanel .reset-btn {
+            display: block; width: 100%; margin-top: 12px; background: rgba(255, 255, 255, 0.06);
+            color: rgba(255, 255, 255, 0.55); border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px; padding: 8px 0; font-size: 12px; cursor: pointer;
+            font-family: "PingFang SC", "Helvetica Neue", sans-serif; transition: all .25s;
+            touch-action: manipulation; pointer-events: auto;
+        }
+
+        .clock-settings { display: block; }
+        .timer-settings { display: none; }
+        .ui-scale-settings { display: block; }
+
+        #modeBtn {
+            position: fixed;
+            top: max(18px, calc(18px + var(--safe-top)));
+            right: max(22px, calc(22px + var(--safe-right)));
+            z-index: 100;
+            background: rgba(255, 255, 255, 0.08);
+            color: rgba(255, 255, 255, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            padding: 10px 18px;
+            font-size: 14px;
+            cursor: pointer;
+            font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            transition: background 0.3s, color 0.3s, transform 0.1s;
+            touch-action: manipulation;
+            pointer-events: auto;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        #modeBtn:hover { background: rgba(255, 255, 255, 0.18); color: #fff; }
+        #modeBtn:active { background: rgba(255, 255, 255, 0.25); transform: scale(0.94); }
+
+        #timerPanel {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform-origin: center center;
+            background: rgba(20, 20, 22, 0.92);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 32px 36px 26px;
+            z-index: 99;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
+            user-select: none;
+            -webkit-user-select: none;
+            max-width: calc(100vw - 40px - var(--safe-left) - var(--safe-right));
+            max-height: calc(100vh - 40px - var(--safe-top) - var(--safe-bottom));
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            touch-action: pan-y;
+            pointer-events: auto;
+        }
+        #timerPanel label { color: rgba(255, 255, 255, 0.5); font-size: 13px; }
+        #timerPanel input {
+            width: 56px; text-align: center; font-size: 26px;
+            background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px; color: #fff; padding: 6px 0; margin: 0 3px;
+            font-family: "Helvetica Neue", "SF Mono", monospace;
+            -webkit-appearance: none; appearance: none;
+            pointer-events: auto; touch-action: manipulation;
+        }
+        #timerPanel .sep { color: rgba(255, 255, 255, 0.35); font-size: 24px; margin: 0 1px; }
+        #timerPanel .btns { margin-top: 20px; text-align: center; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+        #timerPanel button {
+            background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px;
+            padding: 10px 20px; font-size: 14px; cursor: pointer;
+            font-family: "PingFang SC", "Helvetica Neue", sans-serif;
+            transition: all .25s; touch-action: manipulation;
+            pointer-events: auto; white-space: nowrap;
+            user-select: none; -webkit-user-select: none;
+        }
+        #timerPanel button:hover { background: rgba(255, 255, 255, 0.2); color: #fff; }
+        #timerPanel button:active { background: rgba(255, 255, 255, 0.28); transform: scale(0.94); }
+        #timerPanel button.primary { background: rgba(120, 140, 255, 0.25); border-color: rgba(120, 140, 255, 0.3); }
+        #timerPanel button.primary:hover { background: rgba(120, 140, 255, 0.4); }
+        #timerDisplay {
+            text-align: center; font-size: 48px; color: rgba(255, 255, 255, 0.9);
+            font-family: "Helvetica Neue", "SF Mono", monospace; margin: 10px 0 0;
+            letter-spacing: 3px; transition: color 0.4s ease; pointer-events: none;
+        }
+
+        #miniTimerPanel {
+            display: none; position: fixed; z-index: 95;
+            background: rgba(20, 20, 22, 0.9); border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 12px; padding: 8px 10px 10px;
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            user-select: none; -webkit-user-select: none;
+            pointer-events: auto; touch-action: manipulation;
+            overflow: hidden;
+        }
+        #miniTimerDragHandle {
+            width: 100%; height: 18px; cursor: grab;
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: 4px; touch-action: none;
+        }
+        #miniTimerDragHandle:active { cursor: grabbing; }
+        #miniTimerDragHandle::before {
+            content: ''; display: block; width: 28px; height: 3px;
+            background: rgba(255, 255, 255, 0.25); border-radius: 2px;
+        }
+        #miniTimerClose {
+            position: absolute; top: 6px; right: 8px;
+            background: none; border: none; color: rgba(255, 255, 255, 0.5);
+            font-size: 14px; cursor: pointer; padding: 2px 6px; line-height: 1;
+            z-index: 2; touch-action: manipulation; pointer-events: auto;
+        }
+        #miniTimerClose:hover { color: rgba(255, 255, 255, 0.9); }
+        #miniTimerDisplay {
+            text-align: center; font-size: 26px; color: rgba(255, 255, 255, 0.9);
+            font-family: "Helvetica Neue", "SF Mono", monospace;
+            letter-spacing: 2px; margin: 2px 0 6px; pointer-events: none;
+        }
+        #miniTimerPanel .mini-btns {
+            display: flex; flex-wrap: nowrap; justify-content: center; gap: 5px;
+            width: 100%;
+        }
+        #miniTimerPanel .mini-btns button {
+            background: rgba(255, 255, 255, 0.1); color: rgba(255, 255, 255, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 6px;
+            padding: 6px 12px; font-size: 11px; cursor: pointer;
+            font-family: "PingFang SC", "Helvetica Neue", sans-serif;
+            transition: all .2s; touch-action: manipulation;
+            pointer-events: auto; white-space: nowrap;
+            flex-shrink: 0;
+        }
+        #miniTimerPanel .mini-btns button:hover { background: rgba(255, 255, 255, 0.2); color: #fff; }
+        #miniTimerPanel .mini-btns button:active { background: rgba(255, 255, 255, 0.28); transform: scale(0.94); }
+        #miniTimerPanel .mini-btns button.mini-primary { background: rgba(120, 140, 255, 0.25); border-color: rgba(120, 140, 255, 0.3); }
+        #miniResizeHandle {
+            position: absolute; bottom: 0; right: 0; width: 18px; height: 18px;
+            cursor: nwse-resize; background: linear-gradient(135deg, transparent 50%, rgba(255,255,255,0.3) 50%);
+            border-radius: 0 0 12px 0; touch-action: none;
+        }
+
+        @media (max-width: 600px) {
+            #mantra { letter-spacing: 2px; }
+            #digitalClock { letter-spacing: 1px; }
+            #settingsBtn { top: max(10px, calc(10px + var(--safe-top))); left: max(10px, calc(10px + var(--safe-left))); font-size: 16px; padding: 8px 12px; }
+            #settingsPanel { top: max(48px, calc(48px + var(--safe-top))); left: max(10px, calc(10px + var(--safe-left))); min-width: 180px; max-width: calc(100vw - 28px - var(--safe-left) - var(--safe-right)); max-height: calc(100vh - 90px - var(--safe-top) - var(--safe-bottom)); padding: 16px 16px; font-size: 12px; }
+            #modeBtn { top: max(10px, calc(10px + var(--safe-top))); right: max(10px, calc(10px + var(--safe-right))); font-size: 12px; padding: 8px 14px; }
+            #timerPanel { padding: 20px 16px 18px; max-width: calc(100vw - 30px - var(--safe-left) - var(--safe-right)); max-height: calc(100vh - 30px - var(--safe-top) - var(--safe-bottom)); }
+            #timerPanel input { width: 44px; font-size: 22px; }
+            #timerDisplay { font-size: 36px; }
+            #timerPanel button { font-size: 12px; padding: 8px 14px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="digitalClock"></div>
+    <div id="mantra"></div>
+
+    <button id="settingsBtn" title="设置" aria-label="设置">⚙</button>
+    <div id="settingsPanel">
+        <div class="clock-settings">
+            <div class="panel-title">钟表设置</div>
+            <div class="row">
+                <label style="display:inline-block;width:auto;margin:0;cursor:pointer;">
+                    <input type="checkbox" id="showDigital" checked> 显示数字表
+                </label>
+            </div>
+            <div class="row" id="digitSizeRow">
+                <label>数字表字号 <span class="val" id="digitSizeVal">38px</span></label>
+                <input type="range" id="digitSizeRange" min="14" max="60" value="38">
+            </div>
+            <div class="row">
+                <label style="display:inline-block;width:auto;margin:0;cursor:pointer;">
+                    <input type="checkbox" id="showMantra" checked> 显示箴言
+                </label>
+            </div>
+            <div class="row" id="mantraSizeRow">
+                <label>箴言字号 <span class="val" id="mantraSizeVal">24px</span></label>
+                <input type="range" id="mantraSizeRange" min="10" max="40" value="24">
+            </div>
+            <div class="row">
+                <label style="display:inline-block;width:auto;margin:0;cursor:pointer;">
+                    <input type="checkbox" class="miniTimerEnabledCb" id="miniTimerCbClock"> 主页显示计时器
+                </label>
+            </div>
+        </div>
+        <div class="timer-settings">
+            <div class="panel-title">计时器设置</div>
+            <div class="row">
+                <label>面板大小 <span class="val" id="timerScaleVal">100%</span></label>
+                <input type="range" id="timerScaleRange" min="70" max="135" value="100">
+            </div>
+            <div class="row">
+                <label style="display:inline-block;width:auto;margin:0;cursor:pointer;">
+                    <input type="checkbox" id="timerBgmOn" checked> BGM
+                </label>
+            </div>
+            <div class="row" id="timerVolRow">
+                <label>音量 <span class="val" id="timerVolVal">45%</span></label>
+                <input type="range" id="timerVolRange" min="0" max="100" value="45">
+            </div>
+            <div class="row">
+                <label style="display:inline-block;width:auto;margin:0;cursor:pointer;">
+                    <input type="checkbox" class="miniTimerEnabledCb" id="miniTimerCbTimer"> 主页显示计时器
+                </label>
+            </div>
+        </div>
+        <div class="ui-scale-settings">
+            <div class="panel-title">界面缩放</div>
+            <div class="row">
+                <label>按钮与面板大小 <span class="val" id="uiScaleVal">100%</span></label>
+                <input type="range" id="uiScaleRange" min="80" max="150" value="100">
+            </div>
+        </div>
+        <button class="reset-btn" id="globalResetBtn">恢复默认</button>
+    </div>
+
+    <button id="modeBtn">⏱ 计时</button>
+
+    <div id="timerPanel">
+        <div style="text-align:center;margin-bottom:6px;">
+            <label>分</label>
+            <input id="timerMin" type="number" min="0" max="99" value="5" inputmode="numeric">
+            <span class="sep">:</span>
+            <input id="timerSec" type="number" min="0" max="59" value="0" inputmode="numeric">
+            <label>秒</label>
+        </div>
+        <div id="timerDisplay">05:00</div>
+        <div class="btns">
+            <button class="primary" id="btnStart">开始</button>
+            <button id="btnPause">暂停</button>
+            <button id="btnReset">重置</button>
+        </div>
+    </div>
+
+    <div id="miniTimerPanel">
+        <button id="miniTimerClose" title="关闭">✕</button>
+        <div id="miniTimerDragHandle"></div>
+        <div id="miniTimerDisplay">00:00</div>
+        <div class="mini-btns">
+            <button class="mini-primary" id="miniBtnStart">开始</button>
+            <button id="miniBtnPause">暂停</button>
+            <button id="miniBtnReset">重置</button>
+        </div>
+        <div id="miniResizeHandle"></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+    <script>
+        const mantras = [
+            "四时有序，不必追赶", "让时间慢下来陪你养", "葡萄转色时，风也慢半拍",
+            "官厅的水，不记秒", "码农的钟，不必跳秒", "庭前花开，不问春秋",
+            "一炉沉香，半卷残书", "竹影扫阶，尘不动", "松风煮茗，慢火煎心",
+            "月落乌啼，江枫渔火", "不以物喜，不以己悲", "归去，也无风雨也无晴",
+            "采菊东篱下，悠然见南山", "行到水穷处，坐看云起时",
+            "晚来天欲雪，能饮一杯无", "闲云潭影日悠悠，物换星移几度秋",
+            "落花人独立，微雨燕双飞", "小荷才露尖尖角，早有蜻蜓立上头",
+            "春风不度玉门关，杨柳依依在此间", "山高月小，水落石出",
+            "雾失楼台，月迷津渡", "寒蝉凄切，对长亭晚",
+            "梧桐更兼细雨，到黄昏点点滴滴",
+            "二十四桥明月夜，玉人何处教吹箫",
+            "春江潮水连海平，海上明月共潮生"
+        ];
+
+        let lastMantraIndex = -1, lastMantraMinute = -1;
+        function pickMantra() {
+            let idx;
+            do { idx = floor(random(mantras.length)); } while (idx === lastMantraIndex && mantras.length > 1);
+            lastMantraIndex = idx;
+            return mantras[idx];
+        }
+
+        // ===== 全局状态 =====
+        let lastHour = -1, glowT = 0, audioCtx = null, timerMode = false;
+        let bgBright = 220, initDone = false, smoothSecAngle = 0;
+        let timerInterval = null, timerRemaining = 0, timerRunning = false;
+        let brightnessT = 0, isPointerDown = false, pressStartTime = 0;
+        let mode = 'idle', quickClickTimer = 0, holdMaxTimer = 0;
+        const LONG_PRESS_THRESHOLD = 300, FULL_BRIGHT_TIME = 1000;
+        const QUICK_CLICK_HOLD = 3000, HOLD_MAX_HOLD = 2000;
+        let interactingWithDOM = false;
+        let miniTimerEnabled = false;
+
+        let mantraEl = document.getElementById('mantra');
+        let digitalEl = document.getElementById('digitalClock');
+        let settingsPanel = document.getElementById('settingsPanel');
+        let digitRange = document.getElementById('digitSizeRange');
+        let mantraRange = document.getElementById('mantraSizeRange');
+        let showMantraCb = document.getElementById('showMantra');
+        let mantraSizeRow = document.getElementById('mantraSizeRow');
+        let showDigitalCb = document.getElementById('showDigital');
+        let digitSizeRow = document.getElementById('digitSizeRow');
+        let miniTimerCbClock = document.getElementById('miniTimerCbClock');
+        let miniTimerCbTimer = document.getElementById('miniTimerCbTimer');
+        let miniTimerPanel = document.getElementById('miniTimerPanel');
+        let timerPanelEl = document.getElementById('timerPanel');
+
+        // 悬浮窗默认尺寸与比例
+        const MINI_DEFAULT_WIDTH = 180;
+        const MINI_DEFAULT_HEIGHT = 120;
+        const MINI_ASPECT_RATIO = MINI_DEFAULT_WIDTH / MINI_DEFAULT_HEIGHT;
+        const MINI_MIN_WIDTH = 160;
+        const MINI_MIN_HEIGHT = 106;
+        const MINI_MAX_WIDTH = 320;
+        const MINI_MAX_HEIGHT = 213;
+
+        // ===== 钟表设置 =====
+        let clockSettings = { digitFontSize: 38, showMantra: true, mantraFontSize: 24, showDigital: true };
+        const defaultClockSettings = JSON.parse(JSON.stringify(clockSettings));
+
+        function applyClockSettings() {
+            showDigitalCb.checked = clockSettings.showDigital;
+            digitSizeRow.style.opacity = clockSettings.showDigital ? '1' : '0.35';
+            digitRange.disabled = !clockSettings.showDigital;
+            digitalEl.style.fontSize = clockSettings.digitFontSize + 'px';
+            document.getElementById('digitSizeVal').textContent = clockSettings.digitFontSize + 'px';
+            digitRange.value = clockSettings.digitFontSize;
+            mantraEl.style.fontSize = clockSettings.mantraFontSize + 'px';
+            document.getElementById('mantraSizeVal').textContent = clockSettings.mantraFontSize + 'px';
+            mantraRange.value = clockSettings.mantraFontSize;
+            showMantraCb.checked = clockSettings.showMantra;
+            mantraSizeRow.style.opacity = clockSettings.showMantra ? '1' : '0.35';
+            mantraRange.disabled = !clockSettings.showMantra;
+        }
+
+        function clockSettingsDefault() {
+            Object.assign(clockSettings, JSON.parse(JSON.stringify(defaultClockSettings)));
+            applyClockSettings();
+            clampDigitSize(); clampMantraSize();
+        }
+
+        function clampDigitSize() {
+            let maxByClock = floor(layout.clockR * 2 * 0.85 / 5.5);
+            maxByClock = min(maxByClock, 60); maxByClock = max(maxByClock, 14);
+            digitRange.max = maxByClock;
+            if (clockSettings.digitFontSize > maxByClock) clockSettings.digitFontSize = maxByClock;
+            if (clockSettings.digitFontSize < 14) clockSettings.digitFontSize = 14;
+            digitRange.value = clockSettings.digitFontSize;
+            document.getElementById('digitSizeVal').textContent = clockSettings.digitFontSize + 'px';
+            digitalEl.style.fontSize = clockSettings.digitFontSize + 'px';
+        }
+
+        function clampMantraSize() {
+            let maxByClock = floor(layout.clockR * 2 * 0.85 / (clockSettings.mantraFontSize * 0.35));
+            maxByClock = min(maxByClock, 40); maxByClock = max(maxByClock, 10);
+            mantraRange.max = maxByClock;
+            if (clockSettings.mantraFontSize > maxByClock) clockSettings.mantraFontSize = maxByClock;
+            if (clockSettings.mantraFontSize < 10) clockSettings.mantraFontSize = 10;
+            mantraRange.value = clockSettings.mantraFontSize;
+            document.getElementById('mantraSizeVal').textContent = clockSettings.mantraFontSize + 'px';
+            mantraEl.style.fontSize = clockSettings.mantraFontSize + 'px';
+        }
+
+        // ===== 计时器设置 =====
+        let timerSettings = { scale: 1, bgmOn: true, vol: 0.45 };
+        const defaultTimerSettings = JSON.parse(JSON.stringify(timerSettings));
+        const timerScaleRange = document.getElementById('timerScaleRange');
+        const timerScaleVal = document.getElementById('timerScaleVal');
+        const timerBgmOn = document.getElementById('timerBgmOn');
+        const timerVolRow = document.getElementById('timerVolRow');
+        const timerVolRange = document.getElementById('timerVolRange');
+        const timerVolVal = document.getElementById('timerVolVal');
+
+        function applyTimerSettings() {
+            timerPanelEl.style.transform = `translate(-50%,-50%) scale(${timerSettings.scale})`;
+            timerScaleVal.textContent = Math.round(timerSettings.scale * 100) + '%';
+            timerScaleRange.value = Math.round(timerSettings.scale * 100);
+            timerBgmOn.checked = timerSettings.bgmOn;
+            timerVolRow.style.opacity = timerSettings.bgmOn ? '1' : '0.35';
+            timerVolRange.disabled = !timerSettings.bgmOn;
+            let pct = Math.round(timerSettings.vol * 100);
+            timerVolRange.value = pct; timerVolVal.textContent = pct + '%';
+            if (bgmGain && audioCtx) {
+                bgmGain.gain.setTargetAtTime(timerSettings.bgmOn ? timerSettings.vol : 0, audioCtx.currentTime, 0.02);
+            }
+        }
+
+        function timerSettingsDefault() {
+            Object.assign(timerSettings, JSON.parse(JSON.stringify(defaultTimerSettings)));
+            applyTimerSettings();
+        }
+
+        // ===== 界面缩放 =====
+        let uiScale = 1;
+        const uiScaleRange = document.getElementById('uiScaleRange');
+        const uiScaleVal = document.getElementById('uiScaleVal');
+        function applyUIScale(scale) {
+            uiScale = scale;
+            uiScaleVal.textContent = Math.round(scale * 100) + '%';
+            uiScaleRange.value = Math.round(scale * 100);
+            const settingsBtn = document.getElementById('settingsBtn');
+            settingsBtn.style.fontSize = (18 * scale) + 'px';
+            settingsBtn.style.padding = `${10 * scale}px ${16 * scale}px`;
+            const modeBtn = document.getElementById('modeBtn');
+            modeBtn.style.fontSize = (14 * scale) + 'px';
+            modeBtn.style.padding = `${10 * scale}px ${18 * scale}px`;
+            settingsPanel.style.fontSize = (13 * scale) + 'px';
+            settingsPanel.style.padding = `${22 * scale}px ${24 * scale}px`;
+            const titles = settingsPanel.querySelectorAll('.panel-title');
+            titles.forEach(t => t.style.fontSize = (14 * scale) + 'px');
+            const resetBtns = settingsPanel.querySelectorAll('.reset-btn');
+            resetBtns.forEach(b => b.style.fontSize = (12 * scale) + 'px');
+        }
+        uiScaleRange.addEventListener('input', () => applyUIScale(parseInt(uiScaleRange.value) / 100));
+
+        // ===== 悬浮计时器 =====
+        function updateMiniTimerVisibility() {
+            const shouldShow = miniTimerEnabled && !timerMode;
+            miniTimerPanel.style.display = shouldShow ? 'block' : 'none';
+            if (shouldShow) {
+                updateMiniTimerDisplay();
+                updateMiniTimerButtons();
+                updateMiniScale();
+            }
+        }
+
+        function updateMiniTimerDisplay() {
+            let s = timerRemaining;
+            document.getElementById('miniTimerDisplay').textContent = nf(floor(s / 60), 2) + ':' + nf(s % 60, 2);
+        }
+
+        function updateMiniTimerButtons() {
+            const startBtn = document.getElementById('miniBtnStart');
+            if (timerRunning) {
+                startBtn.textContent = '运行中';
+                startBtn.style.opacity = '0.5';
+                startBtn.style.pointerEvents = 'none';
+            } else {
+                startBtn.textContent = '继续';
+                startBtn.style.opacity = '1';
+                startBtn.style.pointerEvents = 'auto';
+            }
+        }
+
+        function syncMiniCheckboxes() {
+            miniTimerCbClock.checked = miniTimerEnabled;
+            miniTimerCbTimer.checked = miniTimerEnabled;
+        }
+
+        function setMiniTimerEnabled(val) {
+            miniTimerEnabled = val;
+            syncMiniCheckboxes();
+            updateMiniTimerVisibility();
+            if (val) {
+                resetMiniSizeAndPosition();
+            }
+        }
+
+        function resetMiniSizeAndPosition() {
+            miniTimerPanel.style.width = MINI_DEFAULT_WIDTH + 'px';
+            miniTimerPanel.style.height = MINI_DEFAULT_HEIGHT + 'px';
+            const initPos = getMiniInitialPosition();
+            miniTimerPanel.style.left = initPos.left + 'px';
+            miniTimerPanel.style.top = initPos.top + 'px';
+            updateMiniScale();
+        }
+
+        function updateMiniScale() {
+            const currentWidth = miniTimerPanel.offsetWidth || MINI_DEFAULT_WIDTH;
+            const scaleRatio = currentWidth / MINI_DEFAULT_WIDTH;
+            const displayEl = document.getElementById('miniTimerDisplay');
+            displayEl.style.fontSize = (26 * scaleRatio) + 'px';
+            const buttons = miniTimerPanel.querySelectorAll('.mini-btns button');
+            buttons.forEach(btn => {
+                btn.style.fontSize = (11 * scaleRatio) + 'px';
+                btn.style.padding = `${6 * scaleRatio}px ${12 * scaleRatio}px`;
+            });
+            const closeBtn = document.getElementById('miniTimerClose');
+            closeBtn.style.fontSize = (14 * scaleRatio) + 'px';
+            const btnContainer = document.querySelector('.mini-btns');
+            if (btnContainer) {
+                btnContainer.style.gap = (5 * scaleRatio) + 'px';
+            }
+        }
+
+        miniTimerCbClock.addEventListener('change', () => setMiniTimerEnabled(miniTimerCbClock.checked));
+        miniTimerCbTimer.addEventListener('change', () => setMiniTimerEnabled(miniTimerCbTimer.checked));
+
+        // 悬浮窗拖动
+        let miniDragging = false, miniDragStartX = 0, miniDragStartY = 0, miniStartLeft = 0, miniStartTop = 0;
+        const miniDragHandle = document.getElementById('miniTimerDragHandle');
+        function getMiniInitialPosition() {
+            const w = windowWidth || window.innerWidth;
+            const h = windowHeight || window.innerHeight;
+            return { left: w - 200, top: h - 160 };
+        }
+        function clampMiniPosition(left, top) {
+            const el = miniTimerPanel;
+            const w = windowWidth || window.innerWidth;
+            const h = windowHeight || window.innerHeight;
+            const elW = el.offsetWidth || MINI_DEFAULT_WIDTH;
+            const elH = el.offsetHeight || MINI_DEFAULT_HEIGHT;
+            left = constrain(left, 0, w - elW);
+            top = constrain(top, 0, h - elH);
+            return { left, top };
+        }
+        miniDragHandle.addEventListener('pointerdown', function(e) {
+            e.stopPropagation(); e.preventDefault();
+            miniDragging = true;
+            miniDragStartX = e.clientX; miniDragStartY = e.clientY;
+            miniStartLeft = miniTimerPanel.offsetLeft; miniStartTop = miniTimerPanel.offsetTop;
+            miniTimerPanel.style.transition = 'none';
+            miniDragHandle.setPointerCapture(e.pointerId);
+        });
+
+        // 悬浮窗等比例缩放
+        let miniResizing = false, resizeStartX = 0, resizeStartY = 0, resizeStartW = 0, resizeStartH = 0;
+        const resizeHandle = document.getElementById('miniResizeHandle');
+        resizeHandle.addEventListener('pointerdown', function(e) {
+            e.stopPropagation(); e.preventDefault();
+            miniResizing = true;
+            resizeStartX = e.clientX; resizeStartY = e.clientY;
+            resizeStartW = miniTimerPanel.offsetWidth;
+            resizeStartH = miniTimerPanel.offsetHeight;
+            resizeHandle.setPointerCapture(e.pointerId);
+        });
+
+        document.addEventListener('pointermove', function(e) {
+            if (miniDragging) {
+                const dx = e.clientX - miniDragStartX;
+                const dy = e.clientY - miniDragStartY;
+                let newLeft = miniStartLeft + dx;
+                let newTop = miniStartTop + dy;
+                const clamped = clampMiniPosition(newLeft, newTop);
+                miniTimerPanel.style.left = clamped.left + 'px';
+                miniTimerPanel.style.top = clamped.top + 'px';
+            } else if (miniResizing) {
+                const dx = e.clientX - resizeStartX;
+                let newW = resizeStartW + dx;
+                newW = constrain(newW, MINI_MIN_WIDTH, MINI_MAX_WIDTH);
+                let newH = newW / MINI_ASPECT_RATIO;
+                newH = constrain(newH, MINI_MIN_HEIGHT, MINI_MAX_HEIGHT);
+                miniTimerPanel.style.width = newW + 'px';
+                miniTimerPanel.style.height = newH + 'px';
+                updateMiniScale();
+            }
+        });
+
+        document.addEventListener('pointerup', function(e) {
+            if (miniDragging) {
+                miniDragging = false;
+                miniTimerPanel.style.transition = '';
+            }
+            if (miniResizing) {
+                miniResizing = false;
+            }
+        });
+
+        // 悬浮窗按钮事件
+        document.getElementById('miniBtnStart').addEventListener('click', function(e) {
+            e.stopPropagation();
+            if (timerRunning) return;
+            if (timerRemaining <= 0) { resetTimer(); if (timerRemaining <= 0) return; }
+            timerRunning = true;
+            document.getElementById('btnStart').textContent = '运行中';
+            updateMiniTimerButtons();
+            startBGM();
+            timerInterval = setInterval(timerTick, 1000);
+        });
+        document.getElementById('miniBtnPause').addEventListener('click', function(e) {
+            e.stopPropagation();
+            if (!timerRunning) return;
+            timerRunning = false;
+            clearInterval(timerInterval); timerInterval = null;
+            stopBGM();
+            document.getElementById('btnStart').textContent = '继续';
+            updateMiniTimerButtons();
+        });
+        document.getElementById('miniBtnReset').addEventListener('click', function(e) {
+            e.stopPropagation();
+            timerRunning = false;
+            clearInterval(timerInterval); timerInterval = null;
+            stopBGM();
+            resetTimer();
+            document.getElementById('btnStart').textContent = '开始';
+            updateMiniTimerVisibility();
+            if (!timerMode) {
+                timerMode = true;
+                timerPanelEl.style.display = 'block';
+                document.getElementById('modeBtn').textContent = '◀ 返回';
+                document.querySelector('.clock-settings').style.display = 'none';
+                document.querySelector('.timer-settings').style.display = 'block';
+                brightnessT = 0; mode = 'idle'; isPointerDown = false;
+                if (settingsPanel.style.display === 'block') settingsPanel.style.display = 'none';
+            }
+        });
+        document.getElementById('miniTimerClose').addEventListener('click', function(e) {
+            e.stopPropagation();
+            setMiniTimerEnabled(false);
+        });
+
+        // ===== 面板层级管理 =====
+        function bringPanelToFront(panel) {
+            if (panel === settingsPanel) {
+                settingsPanel.style.zIndex = '101';
+                timerPanelEl.style.zIndex = '99';
+            } else if (panel === timerPanelEl) {
+                timerPanelEl.style.zIndex = '101';
+                settingsPanel.style.zIndex = '99';
+            }
+        }
+        settingsPanel.addEventListener('pointerdown', function(e) { bringPanelToFront(settingsPanel); });
+        timerPanelEl.addEventListener('pointerdown', function(e) { bringPanelToFront(timerPanelEl); });
+
+        // ===== 事件绑定 =====
+        timerScaleRange.addEventListener('input', () => { timerSettings.scale = parseInt(timerScaleRange.value) / 100; applyTimerSettings(); });
+        timerBgmOn.addEventListener('change', () => { timerSettings.bgmOn = timerBgmOn.checked; applyTimerSettings(); });
+        timerVolRange.addEventListener('input', () => { timerSettings.vol = parseInt(timerVolRange.value) / 100; applyTimerSettings(); });
+
+        digitRange.addEventListener('input', () => { clockSettings.digitFontSize = parseInt(digitRange.value); applyClockSettings(); });
+        mantraRange.addEventListener('input', () => { clockSettings.mantraFontSize = parseInt(mantraRange.value); applyClockSettings(); });
+        showMantraCb.addEventListener('change', () => { clockSettings.showMantra = showMantraCb.checked; applyClockSettings(); });
+        showDigitalCb.addEventListener('change', () => { clockSettings.showDigital = showDigitalCb.checked; applyClockSettings(); });
+
+        // ===== 全局恢复默认 =====
+        document.getElementById('globalResetBtn').addEventListener('click', () => {
+            clockSettingsDefault();
+            timerSettingsDefault();
+            applyUIScale(1);
+            setMiniTimerEnabled(false);
+            resetMiniSizeAndPosition();
+            updateMiniTimerVisibility();
+        });
+
+        // ===== 布局 =====
+        let layout = { cx: 0, cy: 0, clockR: 0 };
+        function recalcLayout() {
+            let w = windowWidth, h = windowHeight;
+            let cx = w / 2, cy = h / 2;
+            let safeBottom = 0, safeTop = 0;
+            try {
+                let cs = getComputedStyle(document.documentElement);
+                safeBottom = parseFloat(cs.getPropertyValue('--safe-bottom')) || 0;
+                safeTop = parseFloat(cs.getPropertyValue('--safe-top')) || 0;
+            } catch (e) {}
+            let effectiveH = h - safeTop - safeBottom - 20;
+            let clockR;
+            if (min(w, h) > 600) {
+                clockR = min(w, h) * 0.30;
+            } else {
+                // 手机端优化：确保钟表完整显示在屏幕内，并留出边距
+                let maxRByWidth = (w - 30) / 2;        // 两边各留15px
+                let maxRByHeight = (effectiveH - 60) / 2; // 上下留出空间
+                clockR = min(w * 0.65, effectiveH * 0.32) / 2;
+                clockR = min(clockR, maxRByWidth, maxRByHeight);
+                clockR = max(clockR, 60); // 最小半径
+            }
+            layout.cx = cx; layout.cy = cy; layout.clockR = clockR;
+
+            let mantraGap = max(clockR * 0.22, 18);
+            let rawMantraTop = cy + clockR + mantraGap;
+            let maxMantraTop = h - safeBottom - 20;
+            let mantraTop = min(rawMantraTop, maxMantraTop);
+            mantraTop = max(mantraTop, cy + clockR + 8);
+            mantraEl.style.top = mantraTop + 'px'; mantraEl.style.left = '50%'; mantraEl.style.transform = 'translate(-50%, -50%)';
+
+            let rawDigitTop = cy + clockR * 0.36;
+            let maxDigitTop = cy + clockR * 0.70;
+            let digitTop = min(rawDigitTop, maxDigitTop);
+            digitTop = max(digitTop, cy - clockR * 0.30);
+            digitalEl.style.top = digitTop + 'px'; digitalEl.style.left = '50%'; digitalEl.style.transform = 'translate(-50%, -50%)';
+
+            clampDigitSize(); clampMantraSize();
+            resizeCanvas(w, h);
+        }
+        function windowResized() { recalcLayout(); }
+
+        // ===== BGM =====
+        let bgmGain = null, bgmNodes = [], bgmPlaying = false, bgmTimer = null;
+        let bgmStartTime = 0, bgmScheduling = false, bgmNextSlot = 0;
+        const chordProgression = [
+            [261.63, 329.63, 392.00], [220.00, 261.63, 329.63],
+            [174.61, 220.00, 261.63], [293.66, 349.23, 440.00],
+            [261.63, 329.63, 392.00], [174.61, 220.00, 261.63],
+            [196.00, 246.94, 293.66], [261.63, 329.63, 392.00]
+        ];
+        const chordDur = 2.0;
+        function scheduleChord(chord, st) {
+            if (!audioCtx || !bgmGain) return;
+            for (let j = 0; j < chord.length; j++) {
+                let freq = chord[j], vol = j === 0 ? 0.08 : 0.04, det = j === 2 ? 3 : j === 1 ? -2 : 0;
+                let o = audioCtx.createOscillator(), g = audioCtx.createGain(), f = audioCtx.createBiquadFilter();
+                o.type = 'sine'; o.frequency.setValueAtTime(freq, st); o.detune.setValueAtTime(det, st);
+                f.type = 'lowpass'; f.frequency.setValueAtTime(800, st); f.Q.setValueAtTime(0.5, st);
+                g.gain.setValueAtTime(0, st); g.gain.linearRampToValueAtTime(vol, st + 0.3);
+                g.gain.linearRampToValueAtTime(vol * 0.4, st + chordDur * 0.7);
+                g.gain.exponentialRampToValueAtTime(0.001, st + chordDur - 0.05);
+                o.connect(f).connect(g).connect(bgmGain); o.start(st); o.stop(st + chordDur + 0.15); bgmNodes.push(o);
+            }
+        }
+        function scheduleAhead() {
+            if (!bgmPlaying || bgmScheduling) return;
+            bgmScheduling = true;
+            let now = audioCtx.currentTime, si = bgmNextSlot;
+            for (let i = 0; i < 4; i++) {
+                let idx = (si + i) % chordProgression.length, st = bgmStartTime + (si + i) * chordDur;
+                if (st > now - 0.15) scheduleChord(chordProgression[idx], st);
+            }
+            bgmNextSlot = si + 4;
+            bgmTimer = setTimeout(() => { bgmScheduling = false; scheduleAhead(); }, 3800);
+        }
+        function startBGM() {
+            if (bgmPlaying) return;
+            ensureAudioCtx();
+            bgmNodes = []; bgmGain = audioCtx.createGain();
+            let v = timerSettings.bgmOn ? timerSettings.vol : 0;
+            bgmGain.gain.setValueAtTime(0, audioCtx.currentTime);
+            bgmGain.gain.linearRampToValueAtTime(v, audioCtx.currentTime + 1.5);
+            bgmGain.connect(audioCtx.destination);
+            bgmPlaying = true; bgmScheduling = false; bgmStartTime = audioCtx.currentTime; bgmNextSlot = 4;
+            for (let i = 0; i < 4; i++) scheduleChord(chordProgression[i], bgmStartTime + i * chordDur);
+            bgmTimer = setTimeout(() => { bgmScheduling = false; scheduleAhead(); }, 3800);
+        }
+        function stopBGM() {
+            if (!bgmPlaying) return;
+            bgmPlaying = false; bgmScheduling = false; bgmNextSlot = 0;
+            if (bgmTimer) { clearTimeout(bgmTimer); bgmTimer = null; }
+            let nodes = bgmNodes, gain = bgmGain; bgmNodes = []; bgmGain = null;
+            if (!gain) { nodes.forEach(n => { try { n.stop() } catch (e) {} }); return; }
+            let t = audioCtx.currentTime;
+            gain.gain.cancelScheduledValues(t); gain.gain.setValueAtTime(gain.gain.value, t);
+            gain.gain.linearRampToValueAtTime(0, t + 0.8);
+            setTimeout(() => { nodes.forEach(n => { try { n.stop() } catch (e) {} }); try { gain.disconnect() } catch (e) {} }, 850);
+        }
+        function ensureAudioCtx() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        // ===== p5 =====
+        function setup() {
+            let cnv = createCanvas(windowWidth, windowHeight);
+            cnv.position(0, 0); cnv.style('z-index', '0'); cnv.style('position', 'fixed');
+            cnv.style('pointer-events', 'auto'); cnv.style('touch-action', 'manipulation');
+            recalcLayout();
+            applyClockSettings();
+            applyTimerSettings();
+            applyUIScale(1);
+            setMiniTimerEnabled(false);
+            resetMiniSizeAndPosition();
+        }
+
+        function isInteractiveElement(el) {
+            if (!el || !el.nodeType || el.nodeType !== 1) return false;
+            const ids = ['modeBtn','settingsBtn','settingsPanel','timerPanel','btnStart','btnPause','btnReset','timerMin','timerSec',
+                         'digitSizeRange','mantraSizeRange','showMantra','timerScaleRange','timerBgmOn','timerVolRange',
+                         'globalResetBtn','uiScaleRange','showDigital',
+                         'miniTimerPanel','miniBtnStart','miniBtnPause','miniBtnReset','miniTimerClose','miniTimerDragHandle','miniResizeHandle'];
+            if (ids.includes(el.id)) return true;
+            if (el.tagName === 'INPUT' || el.tagName === 'BUTTON' || el.tagName === 'LABEL') return true;
+            if (el.closest && (el.closest('#settingsPanel') || el.closest('#timerPanel') || el.closest('#modeBtn') || el.closest('#settingsBtn') || el.closest('#miniTimerPanel'))) return true;
+            return false;
+        }
+
+        function disableCanvasEvents() { let c = document.querySelector('canvas'); if (c) c.style.pointerEvents = 'none'; }
+        function enableCanvasEvents() { let c = document.querySelector('canvas'); if (c) c.style.pointerEvents = 'auto'; }
+
+        document.addEventListener('touchstart', function(e) {
+            if (e.touches.length === 1) {
+                let el = document.elementFromPoint(e.touches[0].clientX, e.touches[0].clientY);
+                if (el && isInteractiveElement(el)) {
+                    interactingWithDOM = true;
+                    disableCanvasEvents();
+                }
+            }
+        }, { passive: false });
+
+        document.addEventListener('touchend', function(e) {
+            if (interactingWithDOM) {
+                setTimeout(() => { interactingWithDOM = false; enableCanvasEvents(); }, 50);
+            }
+        });
+
+        document.addEventListener('mousedown', function(e) {
+            let el = document.elementFromPoint(e.clientX, e.clientY);
+            if (el && isInteractiveElement(el)) {
+                interactingWithDOM = true;
+                disableCanvasEvents();
+            }
+        });
+
+        document.addEventListener('mouseup', function(e) {
+            if (interactingWithDOM) {
+                setTimeout(() => { interactingWithDOM = false; enableCanvasEvents(); }, 50);
+            }
+        });
+
+        function pointerDownHandler() {
+            if (timerMode) return;
+            let el = document.elementFromPoint(mouseX, mouseY);
+            if (el && isInteractiveElement(el)) {
+                interactingWithDOM = true;
+                disableCanvasEvents();
+                return;
+            }
+            interactingWithDOM = false;
+            isPointerDown = true;
+            pressStartTime = millis();
+            mode = 'pressing';
+        }
+
+        function pointerUpHandler() {
+            if (timerMode) return;
+            if (interactingWithDOM) {
+                interactingWithDOM = false;
+                enableCanvasEvents();
+                return;
+            }
+            if (!isPointerDown) return;
+            let elapsed = millis() - pressStartTime;
+            if (elapsed < LONG_PRESS_THRESHOLD) {
+                mode = 'quickClick';
+                quickClickTimer = millis();
+                brightnessT = 1;
+            } else {
+                if (brightnessT >= 0.99) {
+                    mode = 'holdMax';
+                    holdMaxTimer = millis();
+                } else {
+                    mode = 'fading';
+                }
+            }
+            isPointerDown = false;
+        }
+
+        function touchStarted() {
+            let el = document.elementFromPoint(mouseX, mouseY);
+            if (el && isInteractiveElement(el)) { interactingWithDOM = true; disableCanvasEvents(); return true; }
+            interactingWithDOM = false;
+            pointerDownHandler();
+            return false;
+        }
+        function touchEnded() {
+            if (interactingWithDOM) { interactingWithDOM = false; enableCanvasEvents(); return true; }
+            pointerUpHandler();
+            return false;
+        }
+        function mousePressed() {
+            let el = document.elementFromPoint(mouseX, mouseY);
+            if (el && isInteractiveElement(el)) { interactingWithDOM = true; disableCanvasEvents(); return true; }
+            interactingWithDOM = false;
+            pointerDownHandler();
+            return false;
+        }
+        function mouseReleased() {
+            if (interactingWithDOM) { interactingWithDOM = false; enableCanvasEvents(); return true; }
+            pointerUpHandler();
+            return false;
+        }
+
+        function updateBrightnessAndUI() {
+            let now = millis();
+            const panelOpen = settingsPanel.style.display === 'block';
+            const forceHighlight = !timerMode && panelOpen;
+
+            if (forceHighlight) {
+                brightnessT = lerp(brightnessT, 1, 0.2);
+                if (brightnessT > 0.99) brightnessT = 1;
+            } else {
+                if (isPointerDown && mode === 'pressing') {
+                    let elapsed = now - pressStartTime;
+                    let target = constrain(elapsed / FULL_BRIGHT_TIME, 0, 1);
+                    target = max(target, brightnessT);
+                    brightnessT = lerp(brightnessT, target, 0.25);
+                    if (target >= 1 && brightnessT > 0.99) brightnessT = 1;
+                } else if (!isPointerDown) {
+                    if (mode === 'quickClick') {
+                        if (now - quickClickTimer < QUICK_CLICK_HOLD) brightnessT = lerp(brightnessT, 1, 0.3);
+                        else mode = 'fading';
+                    } else if (mode === 'holdMax') {
+                        if (now - holdMaxTimer < HOLD_MAX_HOLD) brightnessT = lerp(brightnessT, 1, 0.3);
+                        else mode = 'fading';
+                    } else if (mode === 'fading' || mode === 'idle') {
+                        brightnessT = lerp(brightnessT, 0, 0.025);
+                        if (brightnessT < 0.002) { brightnessT = 0; mode = 'idle'; }
+                    }
+                }
+            }
+
+            if (clockSettings.showMantra) {
+                let ma = map(brightnessT, 0.1, 1, 0, 0.6);
+                ma = constrain(ma, 0, 0.6);
+                mantraEl.style.color = `rgba(255,255,255,${ma.toFixed(3)})`;
+            } else {
+                mantraEl.style.color = 'rgba(255,255,255,0)';
+            }
+
+            if (clockSettings.showDigital && brightnessT > 0.5) {
+                let nowDate = new Date(), hh = nf(nowDate.getHours(),2), mm = nf(minute(),2), ss = nf(second(),2);
+                digitalEl.textContent = hh + ':' + mm + ':' + ss;
+                let ta = map(brightnessT, 0.5, 1, 0, 230);
+                ta = constrain(ta, 0, 230);
+                digitalEl.style.color = `rgba(235,245,255,${(ta/255).toFixed(3)})`;
+                digitalEl.style.textShadow = `1px 1px 3px rgba(0,0,0,${(ta/255*0.5).toFixed(3)})`;
+            } else {
+                digitalEl.style.color = 'rgba(235,245,255,0)';
+                digitalEl.style.textShadow = 'none';
+            }
+
+            updateMiniTimerVisibility();
+            if (miniTimerPanel.style.display === 'block') updateMiniTimerDisplay();
+        }
+
+        function drawClock() {
+            if (!initDone) { bgBright = lerp(bgBright, 15, 0.04); if (abs(bgBright - 15) < 0.5) { bgBright = 15; initDone = true; } }
+            if (glowT > 0) glowT = max(glowT - 1.2, 0);
+            let cm = minute(); if (cm !== lastMantraMinute) { lastMantraMinute = cm; mantraEl.textContent = pickMantra(); }
+            if (initDone) { let ch = hour(); if (ch !== lastHour) { lastHour = ch; glowT = 200; triggerChime(); } } else { lastHour = hour(); }
+            updateBrightnessAndUI();
+            let { cx, cy, clockR } = layout;
+            let bgVal = bgBright;
+            if (glowT > 0) { let gf = constrain(map(glowT,0,200,55,0),0,55); bgVal = lerp(bgBright, bgBright+gf, glowT/200); }
+            background(bgVal, bgVal, bgVal);
+            let handClar = constrain(0.1 + brightnessT * 0.9, 0, 1);
+            if (brightnessT > 0.2) { noFill(); stroke(255,235,210, map(brightnessT,0.2,1,15,75)*0.22); strokeWeight(1.5); circle(cx,cy,clockR*2+18); }
+            noStroke(); fill(22,22,24,255*brightnessT); circle(cx,cy,clockR*2);
+            if (brightnessT > 0.12) { stroke(255,235,210,45*brightnessT); strokeWeight(1.2); noFill(); [0,3,6,9].forEach(i=>{ let a=-HALF_PI+i*TWO_PI/12; line(cx+cos(a)*(clockR-14),cy+sin(a)*(clockR-14),cx+cos(a)*(clockR-2),cy+sin(a)*(clockR-2)); }); }
+            noStroke(); fill(255,240,220,170*brightnessT); circle(cx,cy,5);
+            let nowDate = new Date(), h=nowDate.getHours()%12, m=nowDate.getMinutes(), s=nowDate.getSeconds(), ms=nowDate.getMilliseconds();
+            let tSecA = (s+ms/1000)*TWO_PI/60-HALF_PI, d=tSecA-smoothSecAngle;
+            if(d>PI)d-=TWO_PI; if(d<-PI)d+=TWO_PI; smoothSecAngle+=d*0.18;
+            drawHand(cx,cy,(h+m/60)*TWO_PI/12-HALF_PI,clockR*0.48,4,handClar,200,185,170);
+            drawHand(cx,cy,(m+s/60)*TWO_PI/60-HALF_PI,clockR*0.73,2.5,handClar,220,210,195);
+            if(brightnessT>0.015)drawHand(cx,cy,tSecA,clockR*0.80,1.0,brightnessT*0.82,255,255,255);
+            if(glowT>50){let gs=constrain(map(glowT,50,200,0,brightnessT*0.85),0,brightnessT*0.85);drawHand(cx,cy,tSecA,clockR*0.80,1.2,gs,255,255,255);}
+            noStroke(); fill(22,22,24,255*brightnessT); circle(cx,cy,8);
+            fill(255,240,220,190*brightnessT); circle(cx,cy,4);
+        }
+        function drawHand(cx,cy,a,len,w,c,r,g,b){if(c<0.04)return;stroke(r,g,b,215*c);strokeWeight(w);line(cx,cy,cx+cos(a)*len,cy+sin(a)*len);line(cx,cy,cx-cos(a)*len*0.1,cy-sin(a)*len*0.1);}
+
+        function draw() {
+            if (timerMode) { updateBrightnessAndUI(); digitalEl.style.color='rgba(235,245,255,0)'; digitalEl.style.textShadow='none'; background(15); }
+            else drawClock();
+        }
+
+        function triggerChime() {
+            ensureAudioCtx(); let o=audioCtx.createOscillator(),g=audioCtx.createGain();
+            o.type='sine'; o.frequency.setValueAtTime(523,audioCtx.currentTime); o.frequency.exponentialRampToValueAtTime(1046,audioCtx.currentTime+0.5);
+            g.gain.setValueAtTime(0.02,audioCtx.currentTime); g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+1.6);
+            o.connect(g).connect(audioCtx.destination); o.start(); o.stop(audioCtx.currentTime+2);
+        }
+
+        // ===== 计时器 =====
+        function updateTimerDisplay() { let s=timerRemaining; document.getElementById('timerDisplay').textContent = nf(floor(s/60),2)+':'+nf(s%60,2); }
+        function timerTick(){ if(!timerRunning)return; timerRemaining--; updateTimerDisplay(); updateMiniTimerDisplay(); if(timerRemaining<=0)timerFinished(); }
+        function timerFinished(){ timerRunning=false; clearInterval(timerInterval); timerInterval=null; stopBGM(); triggerChime(); document.getElementById('btnStart').textContent='开始'; document.getElementById('timerDisplay').style.color='rgba(255,180,150,0.9)'; updateMiniTimerVisibility(); setTimeout(()=>{document.getElementById('timerDisplay').style.color='rgba(255,255,255,0.9)';},1500); }
+
+        document.getElementById('modeBtn').addEventListener('click',(e)=>{
+            e.stopPropagation(); timerMode=!timerMode;
+            let p=document.getElementById('timerPanel'),b=document.getElementById('modeBtn');
+            if(timerMode){ p.style.display='block'; b.textContent='◀ 返回'; document.querySelector('.clock-settings').style.display='none'; document.querySelector('.timer-settings').style.display='block'; brightnessT=0; mode='idle'; isPointerDown=false; if(timerRunning&&!bgmPlaying)startBGM(); }
+            else { p.style.display='none'; b.textContent='⏱ 计时'; document.querySelector('.clock-settings').style.display='block'; document.querySelector('.timer-settings').style.display='none'; }
+            if(settingsPanel.style.display==='block')settingsPanel.style.display='none';
+            updateMiniTimerVisibility();
+        });
+        document.getElementById('btnStart').addEventListener('click',(e)=>{e.stopPropagation(); if(timerRunning)return; if(timerRemaining<=0)resetTimer(); if(timerRemaining<=0)return; timerRunning=true; e.target.textContent='运行中'; document.getElementById('timerDisplay').style.color='rgba(255,255,255,0.9)'; startBGM(); timerInterval=setInterval(timerTick,1000); updateMiniTimerButtons();});
+        document.getElementById('btnPause').addEventListener('click',(e)=>{e.stopPropagation(); if(!timerRunning)return; timerRunning=false; clearInterval(timerInterval); timerInterval=null; stopBGM(); document.getElementById('btnStart').textContent='继续'; updateMiniTimerButtons();});
+        document.getElementById('btnReset').addEventListener('click',(e)=>{e.stopPropagation(); timerRunning=false; clearInterval(timerInterval); timerInterval=null; stopBGM(); resetTimer(); document.getElementById('btnStart').textContent='开始'; document.getElementById('timerDisplay').style.color='rgba(255,255,255,0.9)'; updateMiniTimerVisibility();});
+        function resetTimer(){ timerRunning=false; clearInterval(timerInterval); timerInterval=null; let mm=parseInt(document.getElementById('timerMin').value)||0,ss=parseInt(document.getElementById('timerSec').value)||0; mm=constrain(mm,0,99);ss=constrain(ss,0,59); document.getElementById('timerMin').value=mm;document.getElementById('timerSec').value=ss; timerRemaining=mm*60+ss; updateTimerDisplay(); updateMiniTimerDisplay(); }
+        ['timerMin','timerSec'].forEach(id=>{ document.getElementById(id).addEventListener('change',function(){let v=parseInt(this.value)||0;v=constrain(v,0,id==='timerMin'?99:59);this.value=v;if(!timerRunning)resetTimer();}); document.getElementById(id).addEventListener('input',function(){let v=parseInt(this.value);if(isNaN(v))return;v=constrain(v,0,id==='timerMin'?99:59);this.value=v;if(!timerRunning){let mm=parseInt(document.getElementById('timerMin').value)||0,ss=parseInt(document.getElementById('timerSec').value)||0;timerRemaining=mm*60+ss;updateTimerDisplay();updateMiniTimerDisplay();}}); });
+
+        document.getElementById('settingsBtn').addEventListener('click',(e)=>{ e.stopPropagation(); e.preventDefault(); let open=settingsPanel.style.display==='block'; settingsPanel.style.display=open?'none':'block'; if(!open){ if(!timerMode){ mode='idle'; brightnessT=0; } } });
+        document.addEventListener('click',(e)=>{ if(!settingsPanel.contains(e.target)&&e.target!==document.getElementById('settingsBtn')){ if(settingsPanel.style.display==='block')settingsPanel.style.display='none'; } });
+
+        resetTimer();
+        applyTimerSettings();
+        applyUIScale(1);
+        setMiniTimerEnabled(false);
+        resetMiniSizeAndPosition();
+    </script>
+</body>
+</html>
